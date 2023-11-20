@@ -5,6 +5,36 @@ import fire
 
 from llama import Llama
 from typing import List
+import random
+
+def get_seeds(file_path):
+    datas = []
+    with open(file_path, 'r', encoding='utf-8') as fr:
+        for line in fr.readlines():
+            datas.append(json.loads(line))
+    return datas
+
+
+def get_augmented_dials(file_path):
+    augmented_dials = []
+    with open(file_path, 'r', encoding='utf-8') as fr:
+        for line in fr.readlines():
+            augmented_dials.append(line.strip())
+    return augmented_dials
+
+
+def get_random_indices():
+    random_indices = []
+    while len(random_indices) < 3:
+        index = random.randint(0, 59)
+        if index not in random_indices:
+            random_indices.append(index)
+    return random_indices
+
+
+def format_instruction(datas, random_indices, augmented_dials, i):
+    return f"""### Instruction: Generate dialogue state given dialogues that 'user' is asking 'bot' for recommendation food or travel. I will give you some samples. The 'prev_state' (i.e., previous state) is the dialogue state that determined before the user's last utterance. The 'cur_state' (i.e., current state) is the dialogue state that determined after the user's last utterance. You should generate accurately both 'prev_state' and 'cur_state', following the structure of given samples. \n ### Input: [Dialogue 1] {datas[random_indices[0]]['dialogue']} 'prev_state': {datas[random_indices[0]]['prev_state']} 'cur_state': {datas[random_indices[0]]['cur_state']} \n [Dialogue 2] {datas[random_indices[1]]['dialogue']} 'prev_state': {datas[random_indices[1]]['prev_state']} 'cur_state': {datas[random_indices[1]]['cur_state']} \n [Dialogue 3] {datas[random_indices[2]]['dialogue']} 'prev_state': {datas[random_indices[2]]['prev_state']} 'cur_state': {datas[random_indices[2]]['cur_state']} \n ### Output: [Dialogue 4] {augmented_dials[i]} """
+
 
 def main(
     ckpt_dir: str,
@@ -36,23 +66,14 @@ def main(
         max_batch_size=max_batch_size,
     )
 
-    prompts: List[str] = [
-        # For these prompts, the expected answer is the natural continuation of the prompt
-        "I believe the meaning of life is",
-        "Simply put, the theory of relativity states that ",
-        """A brief message congratulating the team on the launch:
+    seeds = get_seeds('./datas/samples_translation.json')
+    augmented_dialogues = get_augmented_dials('./datas/dialogue_augment.txt')
+    random_indices = get_random_indices()
 
-        Hi everyone,
-        
-        I just """,
-        # Few shot prompt (providing a few examples before asking model to complete more);
-        """Translate English to French:
-        
-        sea otter => loutre de mer
-        peppermint => menthe poivrée
-        plush girafe => girafe peluche
-        cheese =>""",
-    ]
+    prompts = []
+    for i in range(0, 30):
+        prompts.append(format_instruction(seeds, random_indices, augmented_dialogues, i))
+
     results = generator.text_completion(
         prompts,
         max_gen_len=max_gen_len,
